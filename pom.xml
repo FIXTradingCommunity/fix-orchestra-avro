@@ -6,7 +6,7 @@
 	<groupId>io.fixprotocol.orchestra.avro</groupId>
 	<artifactId>repository-avro-parent</artifactId>
 	<packaging>pom</packaging>
-	<version>1.0.0-SNAPSHOT</version>
+	<version>0.0.1-SNAPSHOT</version>
 
 	<name>${project.groupId}:${project.artifactId}</name>
 	<description>Parent project for FIX Orchestra / Apache Avro integration</description>
