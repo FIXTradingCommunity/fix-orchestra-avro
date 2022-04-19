@@ -41,13 +41,19 @@ public class SchemaGeneratorMojo extends AbstractMojo {
 	 * Defines the namespace for the generated schema
 	 */
 	@Parameter(property = "namespace", required = true)
-	String namespace;
+	protected String namespace;
 
 	/**
 	 * Defines if the FIX version from the repository file will be appended to the provided namespace
 	 */
 	@Parameter(property = "appendRepoFixVersionToNamespace", required = false)
-	boolean appendRepoFixVersionToNamespace = true;
+	protected boolean appendRepoFixVersionToNamespace = true;
+	
+	 /**
+	  * The value expected in the "standard" attribute of the mappedDatatype elements of the Orchestra File
+	  */
+	@Parameter(property = "avroStandard", required = false)
+	protected String avroStandard = SchemaGenerator.AVRO_V1;
 
 	
 	public void execute() throws MojoExecutionException {
@@ -72,6 +78,7 @@ public class SchemaGeneratorMojo extends AbstractMojo {
 		generator.setAppendRepoFixVersionToNamespace(appendRepoFixVersionToNamespace);
 		generator.setNormaliseComponents(normaliseComponents);
 		generator.setNormaliseGroups(normaliseGroups);
+		generator.setAvroStandard(avroStandard);
 		
 	    try (FileInputStream inputFile = new FileInputStream(orchestration)) {
 			generator.generate(inputFile, outputDirectory);

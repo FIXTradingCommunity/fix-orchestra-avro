@@ -20,6 +20,7 @@
 					<outputDirectory>target/generated-resources</outputDirectory>
 					<namespace>io.fixprotocol.orchestra.avro.v1</namespace>
 					<appendRepoFixVersionToNamespace>true</appendRepoFixVersionToNamespace>
+					<avroStandard>AvroV1</avroStandard>
 				</configuration>
 			</plugin>
 		</plugins>

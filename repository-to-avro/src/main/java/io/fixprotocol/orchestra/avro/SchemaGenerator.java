@@ -334,7 +334,7 @@ public class SchemaGenerator {
 						memberStrings.add(SchemaGeneratorUtil.getFieldInlineString(fieldRefType, fieldType, fieldName, avroType, fieldIndent));
 					} else {
 						final String generatedType = namespace.concat(".").concat(CODE_SET_DIR).concat(".").concat(codeSet.getName());
-						memberStrings.add(SchemaGeneratorUtil.getFieldInlineString(fieldRefType, fieldType, fieldName, generatedType, fieldIndent));
+						memberStrings.add(SchemaGeneratorUtil.getFieldInlineString(fieldRefType, fieldType, fieldName, "\"".concat(generatedType).concat("\""), fieldIndent));
 					}
 				} else {
 					System.err.format("writeMembersInline : Field missing from repository; id=%d%n", id);
@@ -507,7 +507,6 @@ public class SchemaGenerator {
 			SchemaGeneratorUtil.writeName(writer, name, 1);
 			SchemaGeneratorUtil.writeNameSpace(writer, namespace, CODE_SET_DIR);
 			SchemaGeneratorUtil.writeEnumDef(writer);
-//			final String avroType = getFieldAvroType(fixType, decimalTypeString);
 			List<CodeType> codes = codeSet.getCode();
 			String unknown = "UNKNOWN_".concat(SchemaGeneratorUtil.precedeCapsWithUnderscore(codeSet.getName().replaceAll("CodeSet$", "")));
 			for (CodeType code : codes) {
@@ -596,7 +595,7 @@ public class SchemaGenerator {
 	}
 
 	private static Repository unmarshal(InputStream inputFile) throws JAXBException {
-		final JAXBContext jaxbContext = JAXBContext.newInstance(Repository.class);
+		final JAXBContext jaxbContext = JAXBContext.newInstance(Repository.class, LogicalType.class);
 		final Unmarshaller jaxbUnmarshaller = jaxbContext.createUnmarshaller();
 		return (Repository) jaxbUnmarshaller.unmarshal(inputFile);
 	}

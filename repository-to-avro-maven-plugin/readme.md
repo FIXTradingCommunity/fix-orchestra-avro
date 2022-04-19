@@ -16,4 +16,5 @@ See [repository-to-avro](../repository-to-avro/readme.md) for more information.
  |normaliseGroups|N|Normalise ```Groups``` by writing the schemas to separate files.|false|
  |normaliseComponents|N|Normalise ```Components``` by writing the schemas to separate files.|false|
  |appendRepoFixVersionToNamespace|N|Append the FIX protocol version specified in the Orchestra repository file to the namespace|true|
+ |avroStandard|N|The value expected in the \"standard\" attribute of the mappedDatatype elements of the Orchestra File|"AvroV1"|
  

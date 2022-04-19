@@ -15,6 +15,7 @@ import io.fixprotocol._2020.orchestra.repository.Documentation;
 import io.fixprotocol._2020.orchestra.repository.FieldRefType;
 import io.fixprotocol._2020.orchestra.repository.FieldType;
 import io.fixprotocol._2020.orchestra.repository.MappedDatatype;
+import io.fixprotocol._2020.orchestra.repository.MappedDatatype.Extension;
 import io.fixprotocol._2020.orchestra.repository.PresenceT;
 
 public class SchemaGeneratorUtil {
@@ -23,8 +24,11 @@ public class SchemaGeneratorUtil {
 	public static final String AVRO_BOOLEAN_TYPE = "boolean";
 	public static final String AVRO_STRING_TYPE = "string";
 	public static final String AVRO_DOUBLE_TYPE = "double";
-
+	public static final String AVRO_BYTES_TYPE = "bytes";
+	
+	public static final String FIX_UTC_DATE_ONLY_TYPE = "UTCDateOnly";
 	public static final String FIX_UTC_TIMESTAMP_TYPE = "UTCTimestamp";
+	public static final String FIX_PERCENTAGE_TYPE = "Percentage";
 	public static final String FIX_PRICE_TYPE = "Price";
 	public static final String FIX_CHAR_TYPE = "char";
 	public static final String FIX_BOOLEAN_TYPE = "Boolean";
@@ -62,10 +66,11 @@ public class SchemaGeneratorUtil {
 		result.append(indent(indent));
 		result.append("{");
 		result.append(SchemaGeneratorUtil.getJsonNameValue("name", name, true));
+		// Note that the type is not quoted here as it is received in the appropriate format  
 		if (fieldRefType.getPresence().equals(PresenceT.REQUIRED)) {
-			result.append(SchemaGeneratorUtil.getJsonNameValue("type", type, true));
+			result.append("\"type\": ").append(type).append(",");
 		} else {
-			StringBuffer optionalFieldTypeString = new StringBuffer("[\"null\", \"").append(type).append("\"]");
+			StringBuffer optionalFieldTypeString = new StringBuffer("[\"null\", ").append(type).append("]");
 			result.append("\"type\": ").append(optionalFieldTypeString.toString()).append(",");
 			result.append(" \"default\": null,");
 		}
@@ -211,18 +216,18 @@ public class SchemaGeneratorUtil {
 
 	static String getFieldAvroType(String fieldName, String fixType, Map<String, Datatype> datatypes, String avroStandard) {
 		Datatype datatype = datatypes.get(fixType);
-		if (null== datatype) {
+		if (null == datatype) {
 			throw new IllegalArgumentException(String.format("Orchestra datatype not found for received type: %s of Field: %s", fixType, fieldName));
 		}
 		MappedDatatype mappedDatatype = datatype.getMappedDatatype().stream().filter(md -> md.getStandard().equals(avroStandard))
 	       .findFirst().orElse(null);
-		String avroType = mappedDatatype == null ? null : mappedDatatype.getBase();
-
-		if (null == avroType ) { // apply default mapping
+		StringBuffer avroType = new StringBuffer();
+		if (null == mappedDatatype) {
+			avroType.append("\"");
 			switch (fixType) {
 				case FLOAT_TYPE:
 				case INT_TYPE:
-					avroType = datatype.getName();
+					avroType.append(datatype.getName());
 					break;
 				case FIX_PRICE_TYPE:
 				case "Amt":
@@ -234,10 +239,10 @@ public class SchemaGeneratorUtil {
 				case "TagNum":
 				case "DayOfMonth":
 				case "Percentage":
-					avroType = datatype.getBaseType();
+					avroType.append(datatype.getBaseType());
 					break;
 				case FIX_BOOLEAN_TYPE:
-					avroType = SchemaGeneratorUtil.AVRO_BOOLEAN_TYPE;
+					avroType.append(SchemaGeneratorUtil.AVRO_BOOLEAN_TYPE);
 					break;
 				case FIX_CHAR_TYPE:
 				case "data":
@@ -248,10 +253,29 @@ public class SchemaGeneratorUtil {
 				case "LocalMktDate":
 				case FIX_STRING_TYPE:
 				default:
-					avroType = SchemaGeneratorUtil.AVRO_STRING_TYPE;
+					avroType.append(SchemaGeneratorUtil.AVRO_STRING_TYPE);
+			}
+			avroType.append("\"");
+		} else {
+			Extension extension = mappedDatatype.getExtension();
+			if (null == extension) {
+				avroType.append(String.format("\"%s\"",mappedDatatype.getBase()));
+			} else {
+				avroType.append("{").append("\"type\": \"").append(mappedDatatype.getBase()).append("\", ");
+				List<Object> any = extension.getAny();
+				LogicalType logicalType = (LogicalType)any.get(0);
+				avroType.append(String.format("\"logicalType\": \"%s\"", logicalType.getName()));
+				List<KeyValue> keyValues = logicalType.getKeyValues();
+				if (null != keyValues && keyValues.size() > 0) {
+					avroType.append(", ");
+					List<String> keyValueStrings = new ArrayList<>();
+					keyValues.forEach(kv -> keyValueStrings.add(String.format("\"%s\": \"%s\"", kv.getKey(), kv.getValue())));
+					avroType.append(String.join(", ",keyValueStrings));
+				}
+				avroType.append("}");
 			}
 		} 
-		return avroType;
+		return avroType.toString();
 	}
 
 }
