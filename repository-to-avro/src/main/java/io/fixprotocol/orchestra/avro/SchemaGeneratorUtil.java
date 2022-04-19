@@ -7,15 +7,29 @@ import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
+import io.fixprotocol._2020.orchestra.repository.Datatype;
 import io.fixprotocol._2020.orchestra.repository.Documentation;
 import io.fixprotocol._2020.orchestra.repository.FieldRefType;
 import io.fixprotocol._2020.orchestra.repository.FieldType;
+import io.fixprotocol._2020.orchestra.repository.MappedDatatype;
 import io.fixprotocol._2020.orchestra.repository.PresenceT;
 
 public class SchemaGeneratorUtil {
+	public static final String INT_TYPE = "int";
+	public static final String FLOAT_TYPE = "float";
+	public static final String AVRO_BOOLEAN_TYPE = "boolean";
+	public static final String AVRO_STRING_TYPE = "string";
+	public static final String AVRO_DOUBLE_TYPE = "double";
 
+	public static final String FIX_UTC_TIMESTAMP_TYPE = "UTCTimestamp";
+	public static final String FIX_PRICE_TYPE = "Price";
+	public static final String FIX_CHAR_TYPE = "char";
+	public static final String FIX_BOOLEAN_TYPE = "Boolean";
+	public static final String FIX_STRING_TYPE = "String";
+	
     static String precedeCapsWithUnderscore(String stringToTransform) {
         return stringToTransform.replaceAll("([a-z])([A-Z])", "$1_$2").toUpperCase();
     }
@@ -193,6 +207,51 @@ public class SchemaGeneratorUtil {
 		} else {
 			return stringToConvert;
 		}
+	}
+
+	static String getFieldAvroType(String fieldName, String fixType, Map<String, Datatype> datatypes, String avroStandard) {
+		Datatype datatype = datatypes.get(fixType);
+		if (null== datatype) {
+			throw new IllegalArgumentException(String.format("Orchestra datatype not found for received type: %s of Field: %s", fixType, fieldName));
+		}
+		MappedDatatype mappedDatatype = datatype.getMappedDatatype().stream().filter(md -> md.getStandard().equals(avroStandard))
+	       .findFirst().orElse(null);
+		String avroType = mappedDatatype == null ? null : mappedDatatype.getBase();
+
+		if (null == avroType ) { // apply default mapping
+			switch (fixType) {
+				case FLOAT_TYPE:
+				case INT_TYPE:
+					avroType = datatype.getName();
+					break;
+				case FIX_PRICE_TYPE:
+				case "Amt":
+				case "Qty":
+				case "PriceOffset":
+				case "NumInGroup":
+				case "SeqNum":
+				case "Length":
+				case "TagNum":
+				case "DayOfMonth":
+				case "Percentage":
+					avroType = datatype.getBaseType();
+					break;
+				case FIX_BOOLEAN_TYPE:
+					avroType = SchemaGeneratorUtil.AVRO_BOOLEAN_TYPE;
+					break;
+				case FIX_CHAR_TYPE:
+				case "data":
+				case FIX_UTC_TIMESTAMP_TYPE:
+				case "UTCTimeOnly":
+				case "LocalMktTime":
+				case "UTCDateOnly":
+				case "LocalMktDate":
+				case FIX_STRING_TYPE:
+				default:
+					avroType = SchemaGeneratorUtil.AVRO_STRING_TYPE;
+			}
+		} 
+		return avroType;
 	}
 
 }

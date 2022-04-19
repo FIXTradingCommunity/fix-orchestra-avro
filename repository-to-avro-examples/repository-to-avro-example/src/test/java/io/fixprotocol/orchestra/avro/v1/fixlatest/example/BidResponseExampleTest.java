@@ -33,8 +33,8 @@ class BidResponseExampleTest {
 	@Test
 	void test() throws IOException {
 		BidCompRspGrpItem[] bidCompRspGrpItems = new BidCompRspGrpItem[2];
-		bidCompRspGrpItems[0] = BidResponseExample.createBidCompRspGrpItem("12.10", "GBP");
-		bidCompRspGrpItems[1] = BidResponseExample.createBidCompRspGrpItem("11.11", "EUR");
+		bidCompRspGrpItems[0] = BidResponseExample.createBidCompRspGrpItem(12.10f, "GBP");
+		bidCompRspGrpItems[1] = BidResponseExample.createBidCompRspGrpItem(11.11f, "EUR");
 		
 		String sendingTime0 = "20220311-15:15:15";
 		String sendingTime1 = "20220312-16:16:16";

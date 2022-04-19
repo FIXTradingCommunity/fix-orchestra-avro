@@ -40,6 +40,7 @@ import io.fixprotocol._2020.orchestra.repository.CodeSetType;
 import io.fixprotocol._2020.orchestra.repository.CodeType;
 import io.fixprotocol._2020.orchestra.repository.ComponentRefType;
 import io.fixprotocol._2020.orchestra.repository.ComponentType;
+import io.fixprotocol._2020.orchestra.repository.Datatype;
 import io.fixprotocol._2020.orchestra.repository.FieldRefType;
 import io.fixprotocol._2020.orchestra.repository.FieldType;
 import io.fixprotocol._2020.orchestra.repository.GroupRefType;
@@ -58,12 +59,11 @@ import picocli.CommandLine.Option;
  */
 public class SchemaGenerator {
 
+	public  static final String AVRO_V1 = "AvroV1";
+
 	private static final String AVSC = ".avsc";
 
 	static final int SPACES_PER_LEVEL = 2;
-	
-	private static final String DOUBLE_TYPE = "double";
-	private static final String STRING_TYPE = "string";
 	
 	private static final String CODE_SET_DIR = "codesets";
 	private static final String COMPONENT_DIR = "components";
@@ -75,10 +75,11 @@ public class SchemaGenerator {
 	private boolean isNormaliseComponents = false;
 	private boolean isNormaliseGroups = false;
 
-	private boolean isGenerateStringForDecimal = true;
 	private boolean isAppendRepoFixVersionToNamespace = true;
 	private String namespace = null;
-	
+	private Repository repository;
+	private String avroStandard = AVRO_V1;
+
 	/**
 	 * Runs a SchemaGenerator with command line arguments
 	 *
@@ -89,11 +90,11 @@ public class SchemaGenerator {
 		Options options = new Options();
 		new CommandLine(options).execute(args);
 		try (FileInputStream inputStream = new FileInputStream(new File(options.orchestraFileName))) {
-			generator.setGenerateStringForDecimal(!options.isGenerateStringForDecimal);
             generator.generate(inputStream, new File(options.outputDir));
             generator.setNamespace(options.namespace);
             generator.setNormaliseComponents(options.isNormaliseComponents);
             generator.setNormaliseGroups(options.isNormaliseGroups);
+            generator.setAvroStandard(options.avroStandard);
             generator.setAppendRepoFixVersionToNamespace(options.isAppendRepoFixVersionToNamespace);
 		} catch (Exception e) {
 			e.printStackTrace(System.err);
@@ -116,6 +117,10 @@ public class SchemaGenerator {
 				paramLabel = "NAMESPACE", description = "The namespace for the generated schema, include version if required.")
 		String namespace;
 		
+		@Option(names = { "-a", "--avro-standard" }, required = false, defaultValue = AVRO_V1, 
+				paramLabel = "AVRO-STANDARD", description = "The value expected in the \"standard\" attribute of the mappedDatatype elements of the Orchestra File, Default : ${DEFAULT-VALUE}")
+		String avroStandard  = AVRO_V1;
+		
 		@Option(names = { "--normalise-groups" }, defaultValue = "false", fallbackValue = "true",
 				paramLabel = "NORMALISE-GROUPS", description = "Normalise Groups by writing the schemas to separate files.")
 		boolean isNormaliseGroups = false;
@@ -124,18 +129,10 @@ public class SchemaGenerator {
 				paramLabel = "NORMALISE-COMPONENTS", description = "Normalise Componenents by writing the schemas to separate files.")
 		boolean isNormaliseComponents = false;
 		
-		@Option(names = { "--generate-string-for-decimal" }, defaultValue = "false", fallbackValue = "true", 
-				paramLabel = "GENERATE_STRING_FOR_DECIMAL", description = "Use String type for Decimal Fields instead of double, Default : ${DEFAULT-VALUE}")
-		boolean isGenerateStringForDecimal = true;
-		
 		@Option(names = { "--append-repo-fix-version-to-namespace" }, defaultValue = "true", fallbackValue = "true", 
 				paramLabel = "APPEND_REPO_FIX_VERSION_TO_NAMESPACE", description = "Append the FIX version specified in the Orchestra repository file to the namespace, Default : ${DEFAULT-VALUE}")
 		boolean isAppendRepoFixVersionToNamespace = true;
 	}
-
-	private String decimalTypeString = STRING_TYPE;
-
-	private Repository repository;
 	
 	void initialise(InputStream inputFile) throws JAXBException {
 		this.repository = unmarshal(inputFile);
@@ -153,21 +150,19 @@ public class SchemaGenerator {
 	
 	public void generate(InputStream inputFile, File outputDir) {
 		try {
-			if (!this.isGenerateStringForDecimal) {
-				decimalTypeString = DOUBLE_TYPE;
-			}
-			
 			Map<String, SectionType> sections = new HashMap<String, SectionType>();
 			Map<String, CategoryType> categories = new HashMap<String, CategoryType>();
 			Map<String, CodeSetType> codeSets = new HashMap<>();
 			Map<Integer, ComponentType> components = new HashMap<>();
 			Map<Integer, FieldType> fields = new HashMap<>();
 			Map<Integer, GroupType> groups = new HashMap<>();
+			Map<String, Datatype> datatypes = new HashMap<>();
 			
 			initialise(inputFile);
 
 			repository.getSections().getSection().forEach(s -> {sections.put(s.getName(), s);});
 			repository.getCategories().getCategory().forEach(c -> {categories.put(c.getName(), c);});
+			repository.getDatatypes().getDatatype().forEach(d -> {datatypes.put(d.getName(), d);});
 			
 			final List<MessageType> messages = repository.getMessages().getMessage();
 			final List<FieldType> fieldList = this.repository.getFields().getField();
@@ -187,8 +182,6 @@ public class SchemaGenerator {
 			
 			final File typeDir = SchemaGeneratorUtil.getAvroPath(outputDir, namespace, CODE_SET_DIR);
 			typeDir.mkdirs();
-//			final File fieldDir = SchemaGeneratorUtil.getAvroPath(outputDir, namespace, FIELD_DIR);
-//			fieldDir.mkdirs();
 			final File messageDir = SchemaGeneratorUtil.getAvroPath(outputDir, namespace, MESSAGE_DIR);
 			messageDir.mkdirs();
 			
@@ -196,18 +189,13 @@ public class SchemaGenerator {
 				final String name = codeSet.getName();
 				final String fixType = codeSet.getType();
 				final File codeSetFile = getFilePath(typeDir, name);
-				generateCodeSet(namespace, decimalTypeString, name, codeSet, fixType, codeSetFile);
+				generateCodeSet(namespace, name, codeSet, fixType, codeSetFile);
 			}
-			
-//			for (final FieldType fieldType : fieldList) {
-//				generateField(fieldType, this.namespace, typeDir, fieldDir, codeSets, this.decimalTypeString);
-//			}
-
 			if (isNormaliseGroups) {
 				final File groupDir = SchemaGeneratorUtil.getAvroPath(outputDir, namespace, GROUP_DIR);
 				groupDir.mkdirs();
 				for (final GroupType group : groups.values()) {
-					generateGroup(groupDir, group, this.namespace, groups, components, fields, codeSets);
+					generateGroup(groupDir, group, this.namespace, groups, components, fields, codeSets, datatypes);
 				}
 			}
 			// at time of writing Session Messages do not contain components (only groups),
@@ -216,10 +204,10 @@ public class SchemaGenerator {
 				final File componentDir = SchemaGeneratorUtil.getAvroPath(outputDir, namespace, COMPONENT_DIR);
 				componentDir.mkdirs();
 				for (final ComponentType component : componentList) {
-					generateComponent(componentDir, component, this.namespace, this.decimalTypeString, groups, components, fields, codeSets, this.isNormaliseComponents, this.isNormaliseGroups);
+					generateComponent(componentDir, component, this.namespace, groups, components, fields, codeSets, datatypes, this.isNormaliseComponents, this.isNormaliseGroups, this.avroStandard);
 				}
 			}
-			generateMessages(messageDir, messages, namespace, this.decimalTypeString, groups, components, fields, codeSets, this.isNormaliseComponents, this.isNormaliseGroups);
+			generateMessages(messageDir, messages, namespace, groups, components, fields, codeSets, datatypes, this.isNormaliseComponents, this.isNormaliseGroups, this.avroStandard);
 		} catch (JAXBException | IOException e) {
 			e.printStackTrace();
 		}
@@ -229,21 +217,22 @@ public class SchemaGenerator {
 	private static void generateMessages(File outputDir, 
 			                             final List<MessageType> messages, 
 			                             final String namespace,
-			                             final String decimalTypeString, 
 			                             Map<Integer, GroupType> groups, 
 			                             Map<Integer, ComponentType> components, 
-			                             Map<Integer, FieldType> fields, Map<String, 
-			                             CodeSetType> codeSets,
+			                             Map<Integer, FieldType> fields, 
+			                             Map<String, CodeSetType> codeSets,
+			                             Map<String, Datatype> datatypes,
 										 boolean isNormaliseComponents, 
-										 boolean isNormaliseGroups) throws IOException {
+										 boolean isNormaliseGroups,
+										 String avroStandard) throws IOException {
 		for (final MessageType message : messages) {
-			generateMessage(outputDir, message, namespace, decimalTypeString, groups,  components, fields, codeSets, isNormaliseComponents, isNormaliseGroups);
+			generateMessage(outputDir, message, namespace, groups,  components, fields, codeSets, datatypes, isNormaliseComponents, isNormaliseGroups, avroStandard);
 		}
 	}
 	
 	private static void generateMessage(File messageDir, MessageType message, String namespace,
-			String decimalTypeString, Map<Integer, GroupType> groups, Map<Integer, ComponentType> components,
-			Map<Integer, FieldType> fields, Map<String, CodeSetType> codeSets, boolean isNormaliseComponents, boolean isNormaliseGroups) throws IOException {
+			Map<Integer, GroupType> groups, Map<Integer, ComponentType> components,
+			Map<Integer, FieldType> fields, Map<String, CodeSetType> codeSets, Map<String, Datatype> datatypes, boolean isNormaliseComponents, boolean isNormaliseGroups, String avroStandard) throws IOException {
 		final String name = SchemaGeneratorUtil.toTitleCase(message.getName());
 		
 		final File messageFile = getFilePath(messageDir, name);
@@ -267,7 +256,7 @@ public class SchemaGenerator {
 
 			final List<Object> members = message.getStructure().getComponentRefOrGroupRefOrFieldRef();
 			List<String> memberStrings = new ArrayList<>();
-			getMembersInline(members, namespace, decimalTypeString, groups, components, fields, codeSets, 1, memberStrings, isNormaliseComponents, isNormaliseGroups);
+			getMembersInline(members, namespace, groups, components, fields, codeSets, datatypes, 1, memberStrings, isNormaliseComponents, isNormaliseGroups, avroStandard);
 			writer.write(String.join(",\n", memberStrings));
 			writer.write("\n");
 			writer.write(SchemaGeneratorUtil.indent(1));
@@ -279,13 +268,14 @@ public class SchemaGenerator {
 	private static void generateComponent(File componentDir,
 			              				  ComponentType componentType,
 			              				  String namespace,
-			              				  String decimalTypeString,
 			              				  Map<Integer, GroupType> groups, 
 			              				  Map<Integer, ComponentType> components, 
 			              				  Map<Integer, FieldType> fields,
 										  Map<String, CodeSetType> codeSets,
+										  Map<String, Datatype> datatypes,
 										  boolean isNormaliseComponents,
-										  boolean isNormaliseGroups) throws IOException {
+										  boolean isNormaliseGroups,
+										  String avroStandard) throws IOException {
 		final String name = SchemaGeneratorUtil.toTitleCase(componentType.getName());
 		
 		final File componentFile = getFilePath(componentDir, name);
@@ -308,7 +298,7 @@ public class SchemaGenerator {
 
 			final List<Object> members = componentType.getComponentRefOrGroupRefOrFieldRef();
 			List<String> memberStrings = new ArrayList<>();
-			getMembersInline(members, namespace, decimalTypeString, groups, components, fields, codeSets, 1, memberStrings, isNormaliseComponents, isNormaliseGroups);
+			getMembersInline(members, namespace, groups, components, fields, codeSets, datatypes, 1, memberStrings, isNormaliseComponents, isNormaliseGroups, avroStandard);
 			writer.write(String.join(",\n", memberStrings));
 			writer.write("\n");
 			writer.write(SchemaGeneratorUtil.indent(1));
@@ -319,15 +309,16 @@ public class SchemaGenerator {
 	
 	private static void getMembersInline(List<Object> members, 
 									  String namespace,
-									  String decimalTypeString,
 									  Map<Integer, GroupType> groups, 
 									  Map<Integer, ComponentType> components, 
 									  Map<Integer, FieldType> fields,
 									  Map<String, CodeSetType> codeSets,
+									  Map<String, Datatype> datatypes,
 									  int indent,
 									  List<String> memberStrings,
 									  boolean isNormaliseComponents, 
-									  boolean isNormaliseGroups) throws IOException {
+									  boolean isNormaliseGroups,
+									  String avroStandard) throws IOException {
 		for (final Object member : members) {
 			if (member instanceof FieldRefType) {
 				final FieldRefType fieldRefType = (FieldRefType) member;
@@ -335,11 +326,11 @@ public class SchemaGenerator {
 				final FieldType fieldType = fields.get(id);
 				if (fieldType != null) {
 					int fieldIndent = indent + 1;
-					final String fieldTypeType = SchemaGeneratorUtil.toTitleCase(fieldType.getType());
-					final CodeSetType codeSet = codeSets.get(fieldTypeType);
+					final String fixType = fieldType.getType();
+					final CodeSetType codeSet = codeSets.get(fixType);
 					String fieldName = SchemaGeneratorUtil.firstCharToLowerCase(fieldType.getName());
 					if (null == codeSet) {
-						final String avroType = getFieldAvroType(fieldTypeType, decimalTypeString);
+						final String avroType = SchemaGeneratorUtil.getFieldAvroType(fieldName, fixType, datatypes, avroStandard);
 						memberStrings.add(SchemaGeneratorUtil.getFieldInlineString(fieldRefType, fieldType, fieldName, avroType, fieldIndent));
 					} else {
 						final String generatedType = namespace.concat(".").concat(CODE_SET_DIR).concat(".").concat(codeSet.getName());
@@ -394,15 +385,16 @@ public class SchemaGenerator {
 						getMembersInline(
 								componentMembers,
 								namespace, 
-								decimalTypeString, 
 								groups,
 								components, 
 								fields, 
 								codeSets, 
+								datatypes, 
 								groupIndent,
 								groupMemberStrings, 
 								isNormaliseComponents, 
-								isNormaliseGroups);
+								isNormaliseGroups, 
+								avroStandard);
 						groupString.append(String.join(",\n", groupMemberStrings));
 						groupString.append("\n");
 						groupString.append(indent(groupIndent));
@@ -439,15 +431,16 @@ public class SchemaGenerator {
 						getMembersInline(
 								componentMembers,
 								namespace, 
-								decimalTypeString, 
 								groups, 
 								components, 
 								fields, 
 								codeSets, 
+								datatypes, 
 								indent,
 								memberStrings, 
 								isNormaliseComponents, 
-								isNormaliseGroups);
+								isNormaliseGroups, 
+								avroStandard);
 					}
 				} else {
 					System.err.format("writeMembersInline : Component missing from repository; id=%d%n", id);
@@ -507,23 +500,7 @@ public class SchemaGenerator {
 		return result.toString();
 	}
 
-//	private static void generateField(FieldType fieldType, String namespace, File typeDir, File fieldDir,
-//			Map<String, CodeSetType> codeSets, String decimalTypeString)
-//			throws IOException {
-//		final String name = SchemaGeneratorUtil.toTitleCase(fieldType.getName());
-//		String fieldTypeName = fieldType.getType();
-//		final CodeSetType codeSet = codeSets.get(fieldTypeName);
-//		final File fieldFile = getFilePath(fieldDir, name);
-//		if (null == codeSet) {
-//			final String avroType = getFieldAvroType(fieldTypeName, decimalTypeString);
-//			generateField(fieldType, namespace, decimalTypeString, name, avroType, fieldFile);
-//		} else {
-//			final String generatedType = namespace.concat(".").concat(CODE_SET_DIR).concat(".").concat(fieldTypeName);
-//			generateField(fieldType, namespace, decimalTypeString, name, generatedType, fieldFile);
-//		}
-//	}
-
-	private static void generateCodeSet(String namespace, String decimalTypeString, final String name,
+	private static void generateCodeSet(String namespace, final String name,
 			final CodeSetType codeSet, final String fixType, final File typeFile) throws IOException {
 		try (Writer writer = new OutputStreamWriter(new FileOutputStream(typeFile), StandardCharsets.UTF_8)) {
 			SchemaGeneratorUtil.writeOpenBracket(writer);
@@ -548,16 +525,9 @@ public class SchemaGenerator {
 		}
 	}
 
-//	private static void generateField(FieldType fieldType, String namespace, String decimalTypeString,
-//			final String name, final String type, final File file) throws IOException {
-//		try (Writer writer = new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8)) {
-//			SchemaGeneratorUtil.writeField(fieldType, namespace, name, type, writer);
-//		}
-//	}
-
 	private void generateGroup(File groupDir, GroupType group, String namespace,
 			Map<Integer, GroupType> groups, Map<Integer, ComponentType> components,
-			Map<Integer, FieldType> fields, Map<String, CodeSetType> codeSets) throws IOException {
+			Map<Integer, FieldType> fields, Map<String, CodeSetType> codeSets, Map<String, Datatype> datatypes) throws IOException {
 		final String name = SchemaGeneratorUtil.toTitleCase(group.getName());
 		final File file = getFilePath(groupDir, name);
 		try (Writer writer = new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8)) {
@@ -599,7 +569,7 @@ public class SchemaGenerator {
 			writer.write("\"fields\": [\n");
 			final List<Object> members = group.getComponentRefOrGroupRefOrFieldRef();
 			List<String> memberStrings = new ArrayList<>();
-			getMembersInline(members, namespace, this.decimalTypeString, groups, components, fields, codeSets, 5, memberStrings, this.isNormaliseComponents, this.isNormaliseGroups);
+			getMembersInline(members, namespace, groups, components, fields, codeSets, datatypes, 5, memberStrings, this.isNormaliseComponents, this.isNormaliseGroups, this.avroStandard);
 			writer.write(String.join(",\n", memberStrings));
 			writer.write("\n");
 			writer.write(indent(5));
@@ -625,54 +595,10 @@ public class SchemaGenerator {
 		return new File(dir, sb.toString());
 	}
 
-	private static String getFieldAvroType(String type, String decimalTypeString) {
-		String avroType;
-		switch (type) {
-		case "Price":
-		case "Amt":
-		case "Qty":
-		case "float":
-		case "PriceOffset":
-			avroType = decimalTypeString;
-			break;
-		case "int":
-		case "NumInGroup":
-		case "SeqNum":
-		case "Length":
-		case "TagNum":
-		case "DayOfMonth":
-			avroType = "int";
-			break;
-		case "Boolean":
-			avroType = "boolean";
-			break;
-		case "Percentage":
-			avroType = DOUBLE_TYPE;
-			break;
-		case "char":
-		case "UTCTimestamp":
-		case "UTCTimeOnly":
-		case "LocalMktTime":
-		case "UTCDateOnly":
-		case "LocalMktDate":
-		default:
-			avroType = "string";
-		}
-		return avroType;
-	}
-
 	private static Repository unmarshal(InputStream inputFile) throws JAXBException {
 		final JAXBContext jaxbContext = JAXBContext.newInstance(Repository.class);
 		final Unmarshaller jaxbUnmarshaller = jaxbContext.createUnmarshaller();
 		return (Repository) jaxbUnmarshaller.unmarshal(inputFile);
-	}
-
-	public void setGenerateStringForDecimal(boolean isGenerateBigDecimal) {
-		this.isGenerateStringForDecimal = isGenerateBigDecimal;
-	}
-
-	public boolean isGenerateStringForDecimal() {
-		return this.isGenerateStringForDecimal;
 	}
 
 	public String getNamespace() {
@@ -705,5 +631,9 @@ public class SchemaGenerator {
 
 	public void setNormaliseGroups(boolean isNormaliseGroups) {
 		this.isNormaliseGroups = isNormaliseGroups;
+	}
+
+	public void setAvroStandard(String avroStandard) {
+		this.avroStandard = avroStandard;
 	}
 }

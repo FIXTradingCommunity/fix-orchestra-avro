@@ -12,6 +12,9 @@ Fields are in-lined, distinct schemas are not generated for each ```Field``` typ
 
 Normalisation of ```Components``` and ```Groups``` in distinct schemas is optional. Where schemas are distinct the Avro code generation for Java requires that schema dependencies be imported in the correct order. A schema must be imported before the schema that depends on it.
 
+"Mapped Datatypes" specifying the mapping to Avro types may be provided in the FIX Orchestra "Datatype" elements.
+If they are not provided then the mapping is derived from the applicable FIX type.
+
  Human-readable names are used throughout.
 
  ## Options for Avro schema generation 
@@ -23,6 +26,5 @@ Normalisation of ```Components``` and ```Groups``` in distinct schemas is option
  |--namespace|Y|The namespace for the generated schema, it is recommended to include a semantic version in the namespace.|N/A|
  |--normalise-groups|N|Normalise ```Groups``` by writing the schemas to separate files.|false|
  |--normalise-components|N|Normalise ```Components``` by writing the schemas to separate files.|false|
- |--generate-string-for-decimal|N|Use Avro ```string``` type for FIX ```Decimal``` Fields instead of ```double```|false|
- |--append-repo-fix-version-to-namespace|N|Append the FIX protocol version specified in the Orchestra repository file to the namespace|true|
+  |--append-repo-fix-version-to-namespace|N|Append the FIX protocol version specified in the Orchestra repository file to the namespace|true|
  

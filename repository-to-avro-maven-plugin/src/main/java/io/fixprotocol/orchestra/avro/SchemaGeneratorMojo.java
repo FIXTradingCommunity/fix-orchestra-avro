@@ -26,12 +26,6 @@ public class SchemaGeneratorMojo extends AbstractMojo {
 	protected File outputDirectory;
 	
 	/**
-	 * Determines if FIX Decimal types will be generated using string rather than double
-	 */
-	@Parameter(property = "generateStringForDecimal", required = false)
-	protected boolean generateStringForDecimal = false;
-
-	/**
 	 * Determines if Components will be normalised by writing them to separate files
 	 */
 	@Parameter(property = "normaliseComponents", required = false)
@@ -74,7 +68,6 @@ public class SchemaGeneratorMojo extends AbstractMojo {
 		this.getLog().info(new StringBuilder("Output Directory : ").append(outputDirectory.getAbsolutePath()).toString());
 
 		final SchemaGenerator generator = new SchemaGenerator();
-		generator.setGenerateStringForDecimal(generateStringForDecimal);
 		generator.setNamespace(namespace);
 		generator.setAppendRepoFixVersionToNamespace(appendRepoFixVersionToNamespace);
 		generator.setNormaliseComponents(normaliseComponents);

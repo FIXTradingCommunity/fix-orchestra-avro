@@ -1,9 +1,7 @@
 package io.fixprotocol.orchestra.avro;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -53,12 +51,11 @@ private SchemaGenerator generator;
 		*/
 	  String outputDir = "somewhere/generated-sources";
 	  String input = "target/input";
-	  String[] args = { "--orchestra-file", input, "--output-dir", outputDir, "--generate-string-for-decimal", "--namespace", IO_FIXPROTOCOL_ORCHESTRA_AVRO_V1};
+	  String[] args = { "--orchestra-file", input, "--output-dir", outputDir, "--namespace", IO_FIXPROTOCOL_ORCHESTRA_AVRO_V1};
 	  SchemaGenerator.Options options = new SchemaGenerator.Options();
 	  new CommandLine(options).parseArgs(args);
 	  assertEquals(input, options.orchestraFileName);
 	  assertEquals(outputDir, options.outputDir);
-	  assertTrue(options.isGenerateStringForDecimal);
   }
 
   @Test 
@@ -70,7 +67,6 @@ private SchemaGenerator generator;
 	  new CommandLine(options).parseArgs(args);
 	  assertEquals(input, options.orchestraFileName);
 	  assertEquals(outputDir, options.outputDir);
-	  assertFalse(options.isGenerateStringForDecimal);
   }
   
   @Test 
@@ -82,7 +78,6 @@ private SchemaGenerator generator;
 	  new CommandLine(options).parseArgs(args);
 	  assertEquals(input, options.orchestraFileName);
 	  assertEquals(outputDir, options.outputDir);
-	  assertFalse(options.isGenerateStringForDecimal);
   }
   
   @Test
@@ -92,71 +87,34 @@ private SchemaGenerator generator;
 	  SchemaGenerator.Options options = new SchemaGenerator.Options();
 	  assertThrows(MissingParameterException.class, () -> new CommandLine(options).parseArgs(args) );
   }
-//
-//  @Test 
-//  void testExecute() {
-//	  String outputDir = "target/generated-sources";
-//	  String input = "target/input";
-//	  String[] args = { "--orchestra-file", input};
-//	  SchemaGenerator.Options options = new SchemaGenerator.Options();
-//	  new CommandLine(options).execute(args);
-//	  assertEquals(input, options.orchestraFileName);
-//	  assertEquals(outputDir, options.outputDir);
-//	  assertFalse(options.isGenerateStringForDecimal);
-//  }
-//  
-//  
-//  @Test
-//  void testExecuteOptionNotProvided() {
-//	  String outputDir = "target/generated-sources";
-//	  String[] args = {"--output-dir", outputDir,};
-//	  SchemaGenerator.Options options = new SchemaGenerator.Options();
-//	  new CommandLine(options).execute(args);
-//  }
-//  
-  @Test
-  public void testGenerateStringForBigDecimal() throws IOException {
-	generator.setGenerateStringForDecimal(true);
-	generator.setNamespace(IO_FIXPROTOCOL_ORCHESTRA_AVRO_V1);
-	generator.generate(
-        Thread.currentThread().getContextClassLoader().getResource("trade.xml").openStream(),
-        new File("target/spec/generated-sources/fix50sp2"));
-  }
 
-  @Test
-  public void testGenerateStringForBigDecimalLatest() throws IOException {
-	generator.setGenerateStringForDecimal(true);
-	generator.setNamespace(IO_FIXPROTOCOL_ORCHESTRA_AVRO_V1);
-    generator.generate(
-            Thread.currentThread().getContextClassLoader().getResource("trade-latest.xml").openStream(),
-            new File("target/spec/generated-sources/withBigDecimal/latest"));
-  }
-
-  
-  @Test
-  public void testGenerateWithDouble() throws IOException {
-	generator.setGenerateStringForDecimal(false);
-	generator.setNamespace(IO_FIXPROTOCOL_ORCHESTRA_AVRO_V1);
-	generator.generate(
-        Thread.currentThread().getContextClassLoader().getResource("trade.xml").openStream(),
-        new File("target/spec/generated-sources/fix50sp2"));
+  @Test 
+  void testExecute() {
+	  String outputDir = "target/generated-sources";
+	  String input = "target/input";
+	  String[] args = { "--orchestra-file", input};
+	  SchemaGenerator.Options options = new SchemaGenerator.Options();
+	  new CommandLine(options).execute(args);
+	  assertEquals(input, options.orchestraFileName);
+	  assertEquals(outputDir, options.outputDir);
   }
   
+  
   @Test
-  public void testGenerateWithDoubleLatest() throws IOException {
-	generator.setGenerateStringForDecimal(false);
-	generator.setNamespace(IO_FIXPROTOCOL_ORCHESTRA_AVRO_V1);
-	generator.generate(
-            Thread.currentThread().getContextClassLoader().getResource("trade-latest.xml").openStream(),
-            new File("target/spec/generated-sources/withDouble/latest"));
+  void testExecuteOptionNotProvided() {
+	  String outputDir = "target/generated-sources";
+	  String[] args = {"--output-dir", outputDir,};
+	  SchemaGenerator.Options options = new SchemaGenerator.Options();
+	  new CommandLine(options).execute(args);
   }
-
+  
+ 
   @Test
   public void testGenerateWithNormalise() throws IOException {
-	generator.setGenerateStringForDecimal(false);
 	generator.setNamespace(IO_FIXPROTOCOL_ORCHESTRA_AVRO_V1);
 	generator.setNormaliseComponents(true);
 	generator.setNormaliseGroups(true);
+	generator.setAvroStandard(SchemaGenerator.AVRO_V1);
 	generator.generate(
             Thread.currentThread().getContextClassLoader().getResource("trade-latest.xml").openStream(),
             new File("target/spec/generated-sources/normalised/latest"));

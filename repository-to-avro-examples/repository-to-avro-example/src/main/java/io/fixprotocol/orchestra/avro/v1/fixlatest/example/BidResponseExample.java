@@ -57,7 +57,7 @@ public class BidResponseExample {
 	 * @param currency
 	 * @return
 	 */
-	public static BidCompRspGrpItem createBidCompRspGrpItem(String commission, String currency) {
+	public static BidCompRspGrpItem createBidCompRspGrpItem(float commission, String currency) {
 		return BidCompRspGrpItem.newBuilder().setCommission(commission).setCommCurrency(currency).build();
 	}
 
